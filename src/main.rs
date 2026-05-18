@@ -1,24 +1,33 @@
 use actix_web::{web, http, get, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
 use serde::{Serialize, Deserialize};
+use tokio;
+use sqlx::{self, SqlitePool};
+mod db;
+use db::db::{init_pool, get_all};
+
+const URL: &str = "sqlite:tinyurl.db";
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(||{
-            let cors = Cors::default()
-                .allowed_origin("http://localhost:8000")
-                .allowed_methods(vec!["GET", "POST"])
-                .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
-                .allowed_header(http::header::CONTENT_TYPE)
-                .max_age(3600);
+    let pool = init_pool(URL).await;
+    HttpServer::new(move ||{
+        let cors = Cors::default()
+            .allowed_origin("http://localhost:8000")
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
+            .allowed_header(http::header::CONTENT_TYPE)
+            .max_age(3600);
+
         App::new()
         .wrap(cors)
-        .route("/", web::get().to(index))
-        .service(manual_hello)
-        })
-            .bind(("127.0.0.1", 8080))?
-            .run()
-            .await
+        .app_data(web::Data::new(pool.clone()))
+        .route("/hey", web::get().to(manual_hello))
+        // .configure(routes::configure)
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }
 
 async fn index() -> impl Responder {
@@ -31,14 +40,10 @@ struct MessageBdy {
     message: String
 }
 
-#[get["/hey"]]
-async fn manual_hello() -> HttpResponse {
-
-    let body = MessageBdy {status: 200, message: "hey there".to_string()};
-
-    let serialized = serde_json::to_string(&body).unwrap();
-
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .json(serialized)
+async fn manual_hello(pool: web::Data<SqlitePool>) -> impl Responder {
+    match get_all(pool.get_ref()).await {
+        Ok(urls) => HttpResponse::Ok().json(urls),
+        Err(error) => HttpResponse::InternalServerError().body(error.to_string())
+    }
 }
+
