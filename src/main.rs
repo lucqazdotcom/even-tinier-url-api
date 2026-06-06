@@ -1,16 +1,22 @@
-use actix_web::{web, http, get, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, http, App, HttpServer};
 use actix_cors::Cors;
-use serde::{Serialize, Deserialize};
-use tokio;
-use sqlx::{self, SqlitePool};
+use dotenvy;
 mod db;
-use db::db::{init_pool, get_all};
+mod models;
+mod handler;
+use handler::urls::{get_urls, post_url};
+use db::db::{init_pool};
 
-const URL: &str = "sqlite:tinyurl.db";
+use crate::handler::urls::redirect_url;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let pool = init_pool(URL).await;
+
+    dotenvy::dotenv().ok();
+
+    let db_url = std::env::var("DATABASE_URL").expect("Error fetching database url");
+    let pool = init_pool(&db_url).await;
+
     HttpServer::new(move ||{
         let cors = Cors::default()
             .allowed_origin("http://localhost:8000")
@@ -22,28 +28,13 @@ async fn main() -> std::io::Result<()> {
         App::new()
         .wrap(cors)
         .app_data(web::Data::new(pool.clone()))
-        .route("/hey", web::get().to(manual_hello))
-        // .configure(routes::configure)
+        .route("/urls", web::get().to(get_urls))
+        .route("/new", web::post().to(post_url))
+        .route("/{short_code}", web::get().to(redirect_url))
+        // .route(path, route)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
     .await
-}
-
-async fn index() -> impl Responder {
-    HttpResponse::Ok().body("hello")
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct MessageBdy {
-    status: i32,
-    message: String
-}
-
-async fn manual_hello(pool: web::Data<SqlitePool>) -> impl Responder {
-    match get_all(pool.get_ref()).await {
-        Ok(urls) => HttpResponse::Ok().json(urls),
-        Err(error) => HttpResponse::InternalServerError().body(error.to_string())
-    }
 }
 
