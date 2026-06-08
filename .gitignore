@@ -1,0 +1,13 @@
+# === OS (macOS) ===
+.DS_Store
+
+# === Rust Build Artifacts ===
+target/
+
+# === Environment Files ===
+.env
+.env.*
+!.env.example
+
+# === DB Items ===
+*.db
