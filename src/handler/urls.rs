@@ -1,7 +1,7 @@
 use actix_web::{HttpResponse, Responder, web};
 use sqlx::{self, SqlitePool};
 use uuid::Uuid;
-use crate::db::db::{get_all, insert_url, get_long_by_short};
+use crate::db::db::{get_all, insert_url, get_long_by_short, get_redirect_by_short};
 use crate::models::models::{CreateResponse, CreateRequest};
 
 pub async fn get_urls(pool: web::Data<SqlitePool>) -> impl Responder {
@@ -17,7 +17,6 @@ pub async fn post_url(
     ) -> impl Responder {
 
     let short_code = Uuid::new_v4().to_string()[..6].to_string();
-    println!("this is the body {:#?}", body);
 
     match insert_url(pool.get_ref(), &short_code, &body.long_url).await {
         Ok(response) => HttpResponse::Ok().json(CreateResponse {
@@ -31,13 +30,25 @@ pub async fn post_url(
 
 }
 
+pub async fn retrieve_url(
+    pool: web::Data<SqlitePool>,
+    path: web::Path<String>
+) -> impl Responder {
+    let short_code = path.into_inner();
+
+    match get_long_by_short(pool.get_ref(), &short_code).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(error) => HttpResponse::InternalServerError().body(error.to_string())
+    }
+}
+
 pub async fn redirect_url(
     pool: web::Data<SqlitePool>,
     path: web::Path<String>
 ) -> impl Responder{
     let short_code = path.into_inner();
 
-    match get_long_by_short(pool.get_ref(), &short_code).await {
+    match get_redirect_by_short(pool.get_ref(), &short_code).await {
         Ok(url) => HttpResponse::Found()
             .insert_header(("Location", url.long_url))
             .finish(),
