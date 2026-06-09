@@ -4,10 +4,8 @@ use dotenvy;
 mod db;
 mod models;
 mod handler;
-use handler::urls::{get_urls, post_url};
+use handler::urls::{get_urls, post_url, redirect_url, retrieve_url};
 use db::db::{init_pool};
-
-use crate::handler::urls::redirect_url;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -30,8 +28,8 @@ async fn main() -> std::io::Result<()> {
         .app_data(web::Data::new(pool.clone()))
         .route("/urls", web::get().to(get_urls))
         .route("/new", web::post().to(post_url))
+        .route("/retrieve/{short_code}", web::get().to(retrieve_url))
         .route("/{short_code}", web::get().to(redirect_url))
-        // .route(path, route)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

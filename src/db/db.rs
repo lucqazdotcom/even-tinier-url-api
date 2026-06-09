@@ -31,7 +31,15 @@ pub async fn insert_url(pool: &SqlitePool, short_code: &str, long_url: &str) -> 
     Ok(url)
 }
 
-pub async fn get_long_by_short(pool: &SqlitePool, short_code: &str) -> Result<RedirectResponse, sqlx::Error> {
+pub async fn get_long_by_short(pool: &SqlitePool, short_code: &str) -> Result<Url, sqlx::Error> {
+    let url = sqlx::query_as::<_, Url>("SELECT * FROM urls WHERE short_code = ?")
+        .bind(short_code)
+        .fetch_one(pool)
+        .await?;
+    Ok(url)
+}
+
+pub async fn get_redirect_by_short(pool: &SqlitePool, short_code: &str) -> Result<RedirectResponse, sqlx::Error> {
     let url = sqlx::query_as::<_, RedirectResponse>("SELECT long_url FROM urls WHERE short_code = ?")
         .bind(short_code)
         .fetch_one(pool)
@@ -39,32 +47,3 @@ pub async fn get_long_by_short(pool: &SqlitePool, short_code: &str) -> Result<Re
 
     Ok(url)
 }
-// pub async fn init_db(){
-//     if !Sqlite::database_exists(URL).await.unwrap_or(false) {
-//         println!("creating db");
-//         match Sqlite::create_database(URL).await {
-//             Ok(_) => println!("created db my guy"),
-//             Err(error) => panic!("error: {}", error),
-//         }
-//     }
-//     else {
-//         println!("this db already exists")
-//     }
-//
-//
-//     run_migration(&db).await;
-// }
-//
-// async fn run_migration(pool: &SqlitePool) {
-//     sqlx::query(
-//         "CREATE TABLE IF NOT EXISTS urls (
-//             id  INTEGER PRIMARY KEY AUTOINCREMENT,
-//             short_code TEXT UNIQUE NOT NULL,
-//             long_url TEXT NOT NULL,
-//             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-//         )"
-//     )
-//     .execute(pool)
-//     .await
-//     .expect("Failed to run migration");
-// }
